@@ -3,37 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spot DCA Planner — staged buying, no leverage</title>
+<title>Spot DCA Planner v2 — staged buying, backtested. No leverage.</title>
 <style>
-  :root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--txt:#f0f6fc;--mut:#8b949e;--blue:#2f81f7;--green:#3fb950;--red:#f85149}
+  :root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--txt:#f0f6fc;--mut:#8b949e;--blue:#2f81f7;--green:#3fb950;--red:#f85149;--gold:#f0b429}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:'Segoe UI',Helvetica,Arial,sans-serif}
-  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 64px}
-  h1{font-size:26px;margin:0 0 6px}h1 span{color:var(--blue)}
-  .sub{color:var(--mut);margin:0 0 24px;font-size:14px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+  .wrap{max-width:960px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-size:28px;margin:0 0 6px}h1 span{color:var(--blue)}
+  .sub{color:var(--mut);margin:0 0 8px;font-size:14px;line-height:1.6}
+  .badges{margin:10px 0 22px}.badges span{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--mut);margin-right:8px}
+  .badges b{color:var(--green);font-weight:600}
+  h2.sec{font-size:19px;margin:34px 0 4px}
+  p.secsub{color:var(--mut);font-size:13px;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
   label{display:block;font-size:12px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
   input,select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:10px 12px;font-size:15px}
-  button{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer}
+  button{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;margin-right:10px}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
   button:hover{opacity:.9}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:20px}
-  .card h2{margin:0 0 14px;font-size:17px}
+  .card h3{margin:0 0 14px;font-size:16px}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line)}
   th:first-child,td:first-child{text-align:left}
   th{color:var(--mut);font-weight:600}
   .up{color:var(--green)}.down{color:var(--red)}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
   .kpi{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px}
-  .kpi b{display:block;font-size:22px;margin-top:4px}
+  .kpi b{display:block;font-size:21px;margin-top:4px}
   .kpi span{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
   .note{color:var(--mut);font-size:13px;line-height:1.6;margin-top:14px}
+  canvas{width:100%;height:280px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+  .legend{font-size:12px;color:var(--mut);margin-top:8px}
+  .legend i{display:inline-block;width:22px;height:3px;vertical-align:middle;margin:0 6px 0 14px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Spot DCA <span>Planner</span></h1>
-  <p class="sub">Plan a staged spot entry before the market moves. No leverage. No liquidation line. Just tranches, an average cost, and patience.</p>
+  <h1>Spot DCA <span>Planner</span> <small style="font-size:14px;color:var(--mut)">v2</small></h1>
+  <p class="sub">Plan a staged spot entry before the market moves — then <b style="color:var(--txt)">backtest the same plan against 1,000 days of real SOL price history</b>. No leverage. No liquidation line. Just tranches, an average cost, and patience.</p>
+  <div class="badges"><span>strategy <b>spot only</b></span><span>leverage <b>none</b></span><span>liquidation risk <b>zero</b></span><span>backtest data <b>SOL daily · 2024-02 → 2026-11</b></span></div>
 
+  <h2 class="sec">1 · Build the plan</h2>
+  <p class="secsub">A geometric price ladder from your first tranche to your last, sized by the weighting you choose.</p>
   <div class="grid">
     <div><label>Asset</label><input id="asset" value="SOL"></div>
     <div><label>Total capital (USDT)</label><input id="capital" type="number" value="20000" min="0" step="100"></div>
@@ -48,56 +59,145 @@
     <div><label>Rebound target price</label><input id="target" type="number" value="250" min="0" step="0.0001"></div>
   </div>
   <button onclick="plan()">Build the plan</button>
+  <button class="ghost" onclick="exportCSV()">Export plan as CSV</button>
 
   <div class="card" id="out" style="display:none">
-    <h2>The plan</h2>
+    <h3>The plan</h3>
     <div class="kpis">
       <div class="kpi"><span>Total size</span><b id="kCoins">–</b></div>
       <div class="kpi"><span>Average cost</span><b id="kAvg">–</b></div>
       <div class="kpi"><span>Capital deployed</span><b id="kCap">–</b></div>
-      <div class="kpi"><span>Break-even move</span><b id="kBe">–</b></div>
+      <div class="kpi"><span>Break-even from last tranche</span><b id="kBe">–</b></div>
     </div>
     <table style="margin-top:18px"><thead><tr>
       <th>Tranche</th><th>Trigger price</th><th>USDT in</th><th id="thCoins">Coins</th><th>Cumulative coins</th><th>Running avg cost</th>
     </tr></thead><tbody id="rows"></tbody></table>
-    <h2 style="margin-top:26px">If price goes to…</h2>
+    <h3 style="margin-top:26px">If price goes to…</h3>
     <table><thead><tr><th>Price</th><th>Position value</th><th>Profit / loss</th><th>Return</th></tr></thead>
     <tbody id="scen"></tbody></table>
-    <p class="note">Spot math only: a position built this way cannot be liquidated. The real risks are opportunity cost and your own patience — the plan exists so both are decided in advance, not mid-drawdown.</p>
   </div>
+
+  <h2 class="sec">2 · Backtest it on real history</h2>
+  <p class="secsub">Same idea, walked through real SOL daily closes (Binance public data, baked into this repo). The ladder starts at the first close on/after your start date and spans down by the depth you set. A tranche fills on the first day the close is at or below its trigger.</p>
+  <div class="grid">
+    <div><label>Start date</label><select id="btStart">
+      <option value="2025-01-19">2025-01-19 — near the cycle top ($252)</option>
+      <option value="2025-06-01">2025-06-01 — mid-range ($158)</option>
+      <option value="2026-01-01" selected>2026-01-01 — ($127)</option>
+      <option value="2026-06-01">2026-06-01 — ($81)</option>
+    </select></div>
+    <div><label>Capital (USDT)</label><input id="btCapital" type="number" value="20000" min="0" step="100"></div>
+    <div><label>Stages</label><input id="btStages" type="number" value="6" min="1" max="24" step="1"></div>
+    <div><label>Ladder depth</label><select id="btDepth">
+      <option value="0.3">−30% from start price</option>
+      <option value="0.5" selected>−50% from start price</option>
+      <option value="0.7">−70% from start price</option>
+    </select></div>
+    <div><label>Weighting</label><select id="btWeighting">
+      <option value="equal">Equal tranches</option>
+      <option value="increasing" selected>Increasing (heavier lower)</option>
+      <option value="decreasing">Decreasing (heavier higher)</option>
+    </select></div>
+  </div>
+  <button onclick="backtest()">Run backtest</button>
+
+  <div class="card" id="btOut" style="display:none">
+    <h3>Backtest result</h3>
+    <div class="kpis">
+      <div class="kpi"><span>Tranches filled</span><b id="bFill">–</b></div>
+      <div class="kpi"><span>Coins accumulated</span><b id="bCoins">–</b></div>
+      <div class="kpi"><span>Average cost</span><b id="bAvg">–</b></div>
+      <div class="kpi"><span>Final equity</span><b id="bEq">–</b></div>
+      <div class="kpi"><span>Plan return</span><b id="bRet">–</b></div>
+      <div class="kpi"><span>All-in at start would be</span><b id="bBench">–</b></div>
+    </div>
+    <canvas id="chart" width="900" height="280" style="margin-top:18px"></canvas>
+    <div class="legend">Price (SOL, grey) <i style="background:#8b949e"></i> · Plan equity (green = above water) <i style="background:#3fb950"></i> · Fill points marked on the price line</div>
+    <table style="margin-top:16px"><thead><tr><th>Tranche</th><th>Trigger</th><th>Filled on</th><th>Fill price</th><th>USDT in</th><th>Coins</th></tr></thead>
+    <tbody id="btRows"></tbody></table>
+    <p class="note">Backtest honesty note: fills use daily closes (intraday wicks would fill more, not less), fees are excluded, and unfilled tranches stay as cash in the final equity. Past paths explain mechanics — they do not predict the next one.</p>
+  </div>
+
+  <p class="note" style="margin-top:34px">Spot math only: a position built this way cannot be liquidated. The real risks are opportunity cost and your own patience — the plan exists so both are decided in advance, not mid-drawdown. Not financial advice.</p>
 </div>
 <script>
 const fmt=(n,d=2)=>n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+let lastPlan=null;
+function ladder(p0,p1,n){const a=[];for(let i=0;i<n;i++)a.push(n===1?p0:p0*Math.pow(p1/p0,i/(n-1)));return a;}
+function weights(n,w){const a=[];for(let i=0;i<n;i++)a.push(w==='equal'?1:w==='increasing'?i+1:n-i);return a;}
 function plan(){
   const asset=document.getElementById('asset').value||'COIN';
-  const cap=+document.getElementById('capital').value, p0=+document.getElementById('pStart').value,
-        p1=+document.getElementById('pEnd').value, n=Math.max(1,Math.min(24,+document.getElementById('stages').value||1)),
-        w=document.getElementById('weighting').value, tgt=+document.getElementById('target').value;
+  const cap=+document.getElementById('capital').value,p0=+document.getElementById('pStart').value,
+        p1=+document.getElementById('pEnd').value,n=Math.max(1,Math.min(24,+document.getElementById('stages').value||1)),
+        w=document.getElementById('weighting').value,tgt=+document.getElementById('target').value;
   if(!(cap>0&&p0>0&&p1>0))return;
   document.getElementById('thCoins').textContent=asset;
-  // geometric price ladder from p0 down/up to p1
-  const prices=[]; for(let i=0;i<n;i++){ prices.push(n===1?p0:p0*Math.pow(p1/p0,i/(n-1))); }
-  // weights
-  let ws=prices.map((_,i)=> w==='equal'?1 : w==='increasing'? (i+1) : (n-i));
-  const wSum=ws.reduce((a,b)=>a+b,0);
-  let cumCoins=0,cumCost=0,rows='';
-  prices.forEach((p,i)=>{
-    const usd=cap*ws[i]/wSum, coins=usd/p; cumCoins+=coins; cumCost+=usd;
-    rows+=`<tr><td>#${i+1}</td><td>${fmt(p, p<1?6:2)}</td><td>${fmt(usd)}</td><td>${fmt(coins,4)}</td><td>${fmt(cumCoins,4)}</td><td>${fmt(cumCost/cumCoins, p<1?6:2)}</td></tr>`;
-  });
-  const avg=cumCost/cumCoins;
+  const prices=ladder(p0,p1,n),ws=weights(n,w),wSum=ws.reduce((a,b)=>a+b,0);
+  let cum=0,cost=0,rows='';lastPlan=[];
+  prices.forEach((p,i)=>{const usd=cap*ws[i]/wSum,coins=usd/p;cum+=coins;cost+=usd;
+    lastPlan.push({tranche:i+1,trigger:p,usd,coins,cumCoins:cum,avg:cost/cum});
+    rows+=`<tr><td>#${i+1}</td><td>${fmt(p,p<1?6:2)}</td><td>${fmt(usd)}</td><td>${fmt(coins,4)}</td><td>${fmt(cum,4)}</td><td>${fmt(cost/cum,p<1?6:2)}</td></tr>`;});
+  const avg=cost/cum;
   document.getElementById('rows').innerHTML=rows;
-  document.getElementById('kCoins').textContent=fmt(cumCoins,2)+' '+asset;
-  document.getElementById('kAvg').textContent=fmt(avg, avg<1?6:2);
-  document.getElementById('kCap').textContent=fmt(cumCost)+' USDT';
-  const be=(avg/prices[prices.length-1]-1)*100;
-  const beEl=document.getElementById('kBe'); beEl.textContent=(be>=0?'+':'')+fmt(be,1)+'% from last tranche';
-  const levels=[...new Set([p1, avg, p0, avg*2, tgt].filter(x=>x>0))].sort((a,b)=>a-b);
-  document.getElementById('scen').innerHTML=levels.map(p=>{
-    const val=cumCoins*p, pl=val-cumCost, r=pl/cumCost*100, cls=pl>=0?'up':'down';
-    return `<tr><td>${fmt(p, p<1?6:2)}${p===tgt?' (target)':p===avg?' (your avg)':''}</td><td>${fmt(val)}</td><td class="${cls}">${pl>=0?'+':'−'}${fmt(Math.abs(pl))}</td><td class="${cls}">${r>=0?'+':'−'}${fmt(Math.abs(r),1)}%</td></tr>`;
-  }).join('');
+  document.getElementById('kCoins').textContent=fmt(cum,2)+' '+asset;
+  document.getElementById('kAvg').textContent=fmt(avg,avg<1?6:2);
+  document.getElementById('kCap').textContent=fmt(cost)+' USDT';
+  const be=(avg/prices[n-1]-1)*100,beEl=document.getElementById('kBe');
+  beEl.textContent=(be>=0?'+':'−')+fmt(Math.abs(be),1)+'%';beEl.className=be>=0?'up':'down';beEl.style.fontSize='21px';
+  const levels=[...new Set([p1,avg,p0,avg*2,tgt].filter(x=>x>0))].sort((a,b)=>a-b);
+  document.getElementById('scen').innerHTML=levels.map(p=>{const val=cum*p,pl=val-cost,r=pl/cost*100,cls=pl>=0?'up':'down';
+    return `<tr><td>${fmt(p,p<1?6:2)}${p===tgt?' (target)':p===avg?' (your avg)':''}</td><td>${fmt(val)}</td><td class="${cls}">${pl>=0?'+':'−'}${fmt(Math.abs(pl))}</td><td class="${cls}">${r>=0?'+':'−'}${fmt(Math.abs(r),1)}%</td></tr>`;}).join('');
   document.getElementById('out').style.display='block';
+}
+function exportCSV(){
+  if(!lastPlan){plan();if(!lastPlan)return;}
+  const head='tranche,trigger_price,usdt_in,coins,cumulative_coins,running_avg_cost\n';
+  const body=lastPlan.map(r=>[r.tranche,r.trigger.toFixed(6),r.usd.toFixed(2),r.coins.toFixed(6),r.cumCoins.toFixed(6),r.avg.toFixed(6)].join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([head+body],{type:'text/csv'}));a.download='spot-dca-plan.csv';a.click();URL.revokeObjectURL(a.href);
+}
+let SOL=null;
+async function loadData(){ if(SOL)return SOL; const r=await fetch('data/sol-daily.json'); const j=await r.json(); SOL=j.points; return SOL; }
+async function backtest(){
+  const data=await loadData();
+  const startSel=document.getElementById('btStart').value;
+  const cap=+document.getElementById('btCapital').value,n=Math.max(1,Math.min(24,+document.getElementById('btStages').value||1)),
+        depth=+document.getElementById('btDepth').value,w=document.getElementById('btWeighting').value;
+  let si=data.findIndex(d=>d.date>=startSel); if(si<0)si=0;
+  const series=data.slice(si), startPrice=series[0].close;
+  const triggers=ladder(startPrice,startPrice*(1-depth),n),ws=weights(n,w),wSum=ws.reduce((a,b)=>a+b,0);
+  const fills=new Array(n).fill(null);
+  let coins=0,spent=0; const equity=[];
+  series.forEach(day=>{
+    triggers.forEach((t,i)=>{ if(!fills[i]&&day.close<=t){ const usd=cap*ws[i]/wSum; fills[i]={date:day.date,price:day.close,usd,coins:usd/day.close}; coins+=fills[i].coins; spent+=usd; } });
+    equity.push((cap-spent)+coins*day.close);
+  });
+  const avg=coins>0?spent/coins:0, finalEq=equity[equity.length-1], ret=(finalEq/cap-1)*100;
+  const bench=cap/series[0].close*series[series.length-1].close, benchRet=(bench/cap-1)*100;
+  const filled=fills.filter(Boolean).length;
+  document.getElementById('bFill').textContent=filled+' / '+n;
+  document.getElementById('bCoins').textContent=fmt(coins,2)+' SOL';
+  document.getElementById('bAvg').textContent=coins>0?fmt(avg):'—';
+  document.getElementById('bEq').textContent=fmt(finalEq)+' USDT';
+  const rEl=document.getElementById('bRet'); rEl.textContent=(ret>=0?'+':'−')+fmt(Math.abs(ret),1)+'%'; rEl.style.color=ret>=0?'var(--green)':'var(--red)';
+  const bEl=document.getElementById('bBench'); bEl.textContent=fmt(bench)+' USDT ('+(benchRet>=0?'+':'−')+fmt(Math.abs(benchRet),1)+'%)'; bEl.style.color=benchRet>=0?'var(--green)':'var(--red)';
+  document.getElementById('btRows').innerHTML=fills.map((f,i)=>f
+    ?`<tr><td>#${i+1}</td><td>${fmt(triggers[i])}</td><td>${f.date}</td><td>${fmt(f.price)}</td><td>${fmt(f.usd)}</td><td>${fmt(f.coins,4)}</td></tr>`
+    :`<tr><td>#${i+1}</td><td>${fmt(triggers[i])}</td><td colspan="4" style="text-align:left;color:var(--mut)">never triggered — cash held</td></tr>`).join('');
+  document.getElementById('btOut').style.display='block';
+  drawChart(series,equity,fills);
+}
+function drawChart(series,equity,fills){
+  const cv=document.getElementById('chart'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height,pad=34;
+  ctx.clearRect(0,0,W,H);
+  const prices=series.map(d=>d.close);
+  const all=prices.concat(equity); let mn=Math.min(...all),mx=Math.max(...all); const rg=(mx-mn)||1; mn-=rg*0.05; mx+=rg*0.05;
+  const X=i=>pad+i*(W-2*pad)/(series.length-1), Y=v=>H-pad-(v-mn)*(H-2*pad)/(mx-mn);
+  ctx.strokeStyle='#30363d';ctx.fillStyle='#8b949e';ctx.font='11px sans-serif';
+  for(let g=0;g<=4;g++){const v=mn+(mx-mn)*g/4,y=Y(v);ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();ctx.fillText(fmt(v,0),4,y+3);}
+  ctx.beginPath();prices.forEach((p,i)=>i?ctx.lineTo(X(i),Y(p)):ctx.moveTo(X(i),Y(p)));ctx.strokeStyle='#8b949e';ctx.lineWidth=1.4;ctx.stroke();
+  ctx.beginPath();equity.forEach((p,i)=>i?ctx.lineTo(X(i),Y(p)):ctx.moveTo(X(i),Y(p)));ctx.strokeStyle='#3fb950';ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle='#f0b429';
+  fills.forEach(f=>{ if(!f)return; const i=series.findIndex(d=>d.date===f.date); if(i>=0){ctx.beginPath();ctx.arc(X(i),Y(f.price),4,0,7);ctx.fill();} });
 }
 plan();
 </script>
