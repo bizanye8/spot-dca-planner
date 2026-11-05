@@ -1,0 +1,22 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Smoke-test the CLI (plan + backtest)
+        run: |
+          python3 planner.py --capital 20000 --from 150 --to 60 --stages 6 > /dev/null
+          python3 planner.py --backtest --start 2026-01-01 > /dev/null

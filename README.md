@@ -3,7 +3,7 @@
 ![Type](https://img.shields.io/badge/strategy-spot%20only-3fb950?style=flat-square)
 ![Leverage](https://img.shields.io/badge/leverage-none-3fb950?style=flat-square)
 ![Liquidation risk](https://img.shields.io/badge/liquidation%20risk-zero-2f81f7?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-9%20passing-3fb950?style=flat-square)
+[![Tests](https://github.com/bizanye8/spot-dca-planner/actions/workflows/tests.yml/badge.svg)](https://github.com/bizanye8/spot-dca-planner/actions/workflows/tests.yml)
 ![Demo](https://img.shields.io/badge/demo-live-2f81f7?style=flat-square)
 
 **Plan a staged spot entry before the market moves — then backtest the same plan against 1,000 days of real price history. No leverage, no liquidation line, no improvisation mid-drawdown.**
