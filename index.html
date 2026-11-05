@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spot DCA Planner — staged buying, no leverage</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--txt:#f0f6fc;--mut:#8b949e;--blue:#2f81f7;--green:#3fb950;--red:#f85149}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:'Segoe UI',Helvetica,Arial,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-size:26px;margin:0 0 6px}h1 span{color:var(--blue)}
+  .sub{color:var(--mut);margin:0 0 24px;font-size:14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+  label{display:block;font-size:12px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+  input,select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:10px 12px;font-size:15px}
+  button{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer}
+  button:hover{opacity:.9}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:20px}
+  .card h2{margin:0 0 14px;font-size:17px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--mut);font-weight:600}
+  .up{color:var(--green)}.down{color:var(--red)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  .kpi{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .kpi b{display:block;font-size:22px;margin-top:4px}
+  .kpi span{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+  .note{color:var(--mut);font-size:13px;line-height:1.6;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Spot DCA <span>Planner</span></h1>
+  <p class="sub">Plan a staged spot entry before the market moves. No leverage. No liquidation line. Just tranches, an average cost, and patience.</p>
+
+  <div class="grid">
+    <div><label>Asset</label><input id="asset" value="SOL"></div>
+    <div><label>Total capital (USDT)</label><input id="capital" type="number" value="20000" min="0" step="100"></div>
+    <div><label>First tranche price</label><input id="pStart" type="number" value="150" min="0" step="0.0001"></div>
+    <div><label>Last tranche price</label><input id="pEnd" type="number" value="60" min="0" step="0.0001"></div>
+    <div><label>Stages</label><input id="stages" type="number" value="6" min="1" max="24" step="1"></div>
+    <div><label>Weighting</label><select id="weighting">
+      <option value="equal">Equal tranches</option>
+      <option value="increasing" selected>Increasing (heavier lower)</option>
+      <option value="decreasing">Decreasing (heavier higher)</option>
+    </select></div>
+    <div><label>Rebound target price</label><input id="target" type="number" value="250" min="0" step="0.0001"></div>
+  </div>
+  <button onclick="plan()">Build the plan</button>
+
+  <div class="card" id="out" style="display:none">
+    <h2>The plan</h2>
+    <div class="kpis">
+      <div class="kpi"><span>Total size</span><b id="kCoins">–</b></div>
+      <div class="kpi"><span>Average cost</span><b id="kAvg">–</b></div>
+      <div class="kpi"><span>Capital deployed</span><b id="kCap">–</b></div>
+      <div class="kpi"><span>Break-even move</span><b id="kBe">–</b></div>
+    </div>
+    <table style="margin-top:18px"><thead><tr>
+      <th>Tranche</th><th>Trigger price</th><th>USDT in</th><th id="thCoins">Coins</th><th>Cumulative coins</th><th>Running avg cost</th>
+    </tr></thead><tbody id="rows"></tbody></table>
+    <h2 style="margin-top:26px">If price goes to…</h2>
+    <table><thead><tr><th>Price</th><th>Position value</th><th>Profit / loss</th><th>Return</th></tr></thead>
+    <tbody id="scen"></tbody></table>
+    <p class="note">Spot math only: a position built this way cannot be liquidated. The real risks are opportunity cost and your own patience — the plan exists so both are decided in advance, not mid-drawdown.</p>
+  </div>
+</div>
+<script>
+const fmt=(n,d=2)=>n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+function plan(){
+  const asset=document.getElementById('asset').value||'COIN';
+  const cap=+document.getElementById('capital').value, p0=+document.getElementById('pStart').value,
+        p1=+document.getElementById('pEnd').value, n=Math.max(1,Math.min(24,+document.getElementById('stages').value||1)),
+        w=document.getElementById('weighting').value, tgt=+document.getElementById('target').value;
+  if(!(cap>0&&p0>0&&p1>0))return;
+  document.getElementById('thCoins').textContent=asset;
+  // geometric price ladder from p0 down/up to p1
+  const prices=[]; for(let i=0;i<n;i++){ prices.push(n===1?p0:p0*Math.pow(p1/p0,i/(n-1))); }
+  // weights
+  let ws=prices.map((_,i)=> w==='equal'?1 : w==='increasing'? (i+1) : (n-i));
+  const wSum=ws.reduce((a,b)=>a+b,0);
+  let cumCoins=0,cumCost=0,rows='';
+  prices.forEach((p,i)=>{
+    const usd=cap*ws[i]/wSum, coins=usd/p; cumCoins+=coins; cumCost+=usd;
+    rows+=`<tr><td>#${i+1}</td><td>${fmt(p, p<1?6:2)}</td><td>${fmt(usd)}</td><td>${fmt(coins,4)}</td><td>${fmt(cumCoins,4)}</td><td>${fmt(cumCost/cumCoins, p<1?6:2)}</td></tr>`;
+  });
+  const avg=cumCost/cumCoins;
+  document.getElementById('rows').innerHTML=rows;
+  document.getElementById('kCoins').textContent=fmt(cumCoins,2)+' '+asset;
+  document.getElementById('kAvg').textContent=fmt(avg, avg<1?6:2);
+  document.getElementById('kCap').textContent=fmt(cumCost)+' USDT';
+  const be=(avg/prices[prices.length-1]-1)*100;
+  const beEl=document.getElementById('kBe'); beEl.textContent=(be>=0?'+':'')+fmt(be,1)+'% from last tranche';
+  const levels=[...new Set([p1, avg, p0, avg*2, tgt].filter(x=>x>0))].sort((a,b)=>a-b);
+  document.getElementById('scen').innerHTML=levels.map(p=>{
+    const val=cumCoins*p, pl=val-cumCost, r=pl/cumCost*100, cls=pl>=0?'up':'down';
+    return `<tr><td>${fmt(p, p<1?6:2)}${p===tgt?' (target)':p===avg?' (your avg)':''}</td><td>${fmt(val)}</td><td class="${cls}">${pl>=0?'+':'−'}${fmt(Math.abs(pl))}</td><td class="${cls}">${r>=0?'+':'−'}${fmt(Math.abs(r),1)}%</td></tr>`;
+  }).join('');
+  document.getElementById('out').style.display='block';
+}
+plan();
+</script>
+</body>
+</html>
